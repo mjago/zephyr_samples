@@ -1,0 +1,3 @@
+* Modified Zephyr RTOS Samples
+** Compile script (calls west)
+   ./compile project_name && screen /dev/ttyACM0 115200 -c ~/.screenrc

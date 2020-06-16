@@ -1,0 +1,227 @@
+#!ruby -w
+
+require "pty"
+require "timeout"
+require "colorize"
+require "colorized_string"
+
+@prj_name = ARGV[0].strip if ARGV[0].class == String
+@prj_arch  = "nrf52dk_nrf52832"
+@prj_build = "west flash"
+
+BASE_PATH  = "/home/martyn/zephyrproject/samples/"
+BASIC_PATH = BASE_PATH + "basic/"
+BLE_PATH = BASE_PATH + "bluetooth/"
+BASIC_PRJ  = %w[
+  blink_led button fade_led minimal blinky servo_motor threads
+]
+BLE_PRJ = %w[
+  attrs beacon central central_hr eddystone handsfree hci_pwr_ctrl
+  hci_rpmsg hci_spi hci_uart hci_usb ibeacon ipsp mesh mesh_demo
+  mesh_provisioner peripheral peripheral_csc peripheral_dis
+  peripheral_esp peripheral_hids peripheral_hr peripheral_ht
+  peripheral_sc_only protect protect_backup2 protect_backup4
+  scan_adv st_ble_sensor
+]
+
+DRIVERS_PATH = "/home/martyn/zephyr/samples/drivers/"
+DRIVERS_PRJ  = %w[
+  CAN counter crypto current_sensing display drivers.rst
+  entropy espi flash_shell gpio ht16k33 i2c_fujitsu_fram
+  kscan lcd_hd44780 led_apa102 led_apa102c_bitbang
+  led_lp3943 led_lp5562 led_lpd8806 led_pca9633 led_ws2812
+  lora peci ps2 soc_flash_nrf spi_flash spi_fujitsu_fram
+  watchdog
+]
+
+PRJ_TYPES = [
+  { path: BASIC_PATH  , prj:  BASIC_PRJ   },
+  { path: BLE_PATH    , prj:  BLE_PRJ     },
+  { path: DRIVERS_PATH, prj:  DRIVERS_PRJ },
+]
+
+PRJ_TYPES.each do |t|
+  if t[:prj].include? @prj_name
+    @prj_path = t[:path] + @prj_name
+  end
+end
+
+if @prj_path.nil?
+  prjs = []
+  puts "Usage: > ./screen project_name"
+  puts "\nprojects:\n"
+  PRJ_TYPES.each do |t|
+    prjs << t[:prj]
+  end
+  puts prjs.sort.join("\n")
+  exit 1
+end
+
+now = Time.now
+fail_type = 0
+`(west build -p always -b #{@prj_arch} #{@prj_path}) > out.txt 2>&1`
+
+#File.open "out.txt" do |f|
+#puts "here"
+#  puts f.read
+#end
+#exit
+
+words = [
+  {
+    text: "FAILED:",
+    fore_line: :black,
+    back_line: :light_red,
+    fore_word: :black,
+    back_word: :light_red,
+    space:     :light_red
+  },
+  {
+    text: "failed.",
+    fore_line: :black,
+    back_line: :light_red,
+    fore_word: :black,
+    back_word: :light_red,
+    space:     :light_red
+  },
+  {
+    text: "error:",
+    fore_line: :black,
+    back_line: :white,
+    fore_word: :light_red,
+    back_word: :black,
+    space:     :black
+  },
+  {
+    text: "ERROR:",
+    fore_line: :black,
+    back_line: :white,
+    fore_word: :light_red,
+    back_word: :black,
+    space:     :black
+  },
+  {
+    text: "warning:",
+    fore_line: :black,
+    back_line: :white,
+    fore_word: :light_yellow,
+    back_word: :black,
+    space:     :black
+  }
+]
+
+File.open("out.txt", "r") do |f|
+  f.readlines.each_with_index do |line, idx|
+    next if line[0..0] == "["
+    next if line[0..1] == "--"
+    line = line.gsub(@prj_path, "src/")
+    modified = false
+    words.each_with_index do |word, word_idx|
+      x = line.index(word[:text])
+      if x && ! modified
+        print (line[0..x + -1]).strip.colorize(:color => word[:fore_line],
+                                               :background => word[:back_line])
+        print " ".colorize(:background => word[:space])
+        print (word[:text]).strip.colorize(:color => word[:fore_word],
+                                        :background => word[:back_word])
+        print " ".colorize(:background => word[:space])
+        print (line[(x + word[:text].size)..-1]).strip.colorize(:color => word[:fore_line],
+                                                             :background => word[:back_line])
+        puts
+        modified = true
+        fail_type = word_idx + 1 if fail_type == 0
+      end
+    end
+    if ! modified
+      size = line.size
+      size.times do |pos|
+        char = line[pos..pos]
+        done = false
+        ["|", "^", "~"].each_with_index do |special, idx|
+          if char == special
+            print char.colorize(color: :magenta)
+            done = true
+            break;
+          end
+        end
+        print char.colorize(color: :cyan) unless done
+      end
+    end
+  end
+end
+
+def run(cmd, board_num)
+  multiple = false
+  temp = nil
+  period = 0.5
+  begin
+    PTY.spawn(cmd) do |r,w,pid|
+      begin
+        now2 = Time.now
+        w.puts "west flash\n"
+        loop do
+          begin
+            Timeout::timeout period do
+              temp = r.gets.chomp
+            end
+          rescue Timeout::Error
+            if multiple
+              w.puts board_num
+              puts "Programming board: #{board_num}".colorize(:color => :yellow)
+              multiple = false
+              period = 5
+            else
+              puts "here"
+            end
+          end
+          multiple = true if temp.strip.include?("There are multiple boards connected.")
+          if (Time.now - now2) > (20)
+            puts "ERROR: run() Timed out!"
+            exit 1
+          end
+        end
+      rescue Errno::EIO
+      end
+    end
+  end
+end
+
+case fail_type
+when 0         then status = "Passed"  ; colour = :light_green
+when 1, 2, 3,4 then status = "Failed"  ; colour = :light_red
+when 5         then status = "Warnings"; colour = :light_yellow
+else
+  raise "Error: Invalid fail_type!"
+end
+
+ret = nil
+
+if ARGV[1]
+  (ARGV.size - 1).times do |idx|
+    board_num = ARGV[idx + 1].to_i
+    if board_num < 1
+      raise "ERROR: invalid board number! (#{ARGV[idx + 1]}])"
+    end
+    ret = run(@prj_build, board_num)
+  end
+else
+  ret = system(@prj_build)
+end
+
+duration = Time.now - now
+puts
+puts "   *   *   Build #{status} (#{duration.round(1)} sec)    *   *".
+       colorize(:color => colour)
+puts
+ret_val = ret ? 0 : 1
+exit ret_val
+
+
+#   #   #   #   #   #   #   #   #   #   #   #   #   #   #   #   #   #   #   #   #   #
+
+# return array of all possible colors
+ColorizedString.colors.each do |colour|
+  puts colour.to_s.colorize(:color => colour.to_sym)
+end
+puts
+puts ColorizedString.modes
