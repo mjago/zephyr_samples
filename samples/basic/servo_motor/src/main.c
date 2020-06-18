@@ -13,8 +13,10 @@
 #include <device.h>
 #include <drivers/pwm.h>
 
-#define PWM_NODE    DT_LABEL(DT_N_NODELABEL_pwm0)
-#define PWM_CHANNEL DT_N_S_soc_S_pwm_4001c000_P_ch0_pin
+#define PWM_NODE    DT_LABEL(DT_ALIAS(servo_pwm))
+#define PWM_CHANNEL DT_PROP(DT_ALIAS(servo_pwm), ch0_pin)
+
+//#define PWM_CHANNEL DT_N_S_soc_S_pwm_4001c000_P_ch0_pin
 
 /*
  * Unlike pulse width, the PWM period is not a critical parameter for

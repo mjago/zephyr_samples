@@ -12,32 +12,42 @@ require "colorized_string"
 BASE_PATH  = "/home/martyn/zephyrproject/samples/"
 BASIC_PATH = BASE_PATH + "basic/"
 BLE_PATH = BASE_PATH + "bluetooth/"
-BASIC_PRJ  = %w[
-  blink_led button fade_led minimal blinky servo_motor threads
-]
-BLE_PRJ = %w[
-  attrs beacon central central_hr eddystone handsfree hci_pwr_ctrl
-  hci_rpmsg hci_spi hci_uart hci_usb ibeacon ipsp mesh mesh_demo
-  mesh_provisioner peripheral peripheral_csc peripheral_dis
-  peripheral_esp peripheral_hids peripheral_hr peripheral_ht
-  peripheral_sc_only protect protect_backup2 protect_backup4
-  scan_adv st_ble_sensor
-]
-
-DRIVERS_PATH = "/home/martyn/zephyr/samples/drivers/"
-DRIVERS_PRJ  = %w[
-  CAN counter crypto current_sensing display drivers.rst
-  entropy espi flash_shell gpio ht16k33 i2c_fujitsu_fram
-  kscan lcd_hd44780 led_apa102 led_apa102c_bitbang
-  led_lp3943 led_lp5562 led_lpd8806 led_pca9633 led_ws2812
-  lora peci ps2 soc_flash_nrf spi_flash spi_fujitsu_fram
-  watchdog
-]
+DRIVERS_PATH = BASE_PATH + "drivers/"
 
 PRJ_TYPES = [
-  { path: BASIC_PATH  , prj:  BASIC_PRJ   },
-  { path: BLE_PATH    , prj:  BLE_PRJ     },
-  { path: DRIVERS_PATH, prj:  DRIVERS_PRJ },
+  { path: BASE_PATH,
+    prj:  %w[
+        mix
+      ]
+  },
+  { path: BASIC_PATH,
+    prj:  %w[
+        blink_led button fade_led minimal
+        blinky servo_motor threads
+      ]
+  },
+  {
+    path: BLE_PATH,
+    prj:  %w[
+        attrs beacon central central_hr eddystone handsfree hci_pwr_ctrl
+        hci_rpmsg hci_spi hci_uart hci_usb ibeacon ipsp mesh mesh_demo
+        mesh_provisioner peripheral peripheral_csc peripheral_dis
+        peripheral_esp peripheral_hids peripheral_hr peripheral_ht
+        peripheral_sc_only protect protect_backup2 protect_backup4
+        scan_adv st_ble_sensor
+      ]
+  },
+  {
+    path: DRIVERS_PATH,
+    prj:  %w[
+        CAN counter crypto current_sensing display drivers.rst
+        entropy espi flash_shell gpio ht16k33 i2c_fujitsu_fram
+        kscan lcd_hd44780 led_apa102 led_apa102c_bitbang
+        led_lp3943 led_lp5562 led_lpd8806 led_pca9633 led_ws2812
+        lora peci ps2 soc_flash_nrf spi_flash spi_fujitsu_fram
+        watchdog
+    ]
+  }
 ]
 
 PRJ_TYPES.each do |t|
